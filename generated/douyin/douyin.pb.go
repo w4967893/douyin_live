@@ -279,6 +279,8 @@ type Message struct {
 	NeedWrdsStore bool   `protobuf:"varint,6,opt,name=needWrdsStore,proto3" json:"needWrdsStore,omitempty"`
 	WrdsVersion   int64  `protobuf:"varint,7,opt,name=wrdsVersion,proto3" json:"wrdsVersion,omitempty"`
 	WrdsSubKey    string `protobuf:"bytes,8,opt,name=wrdsSubKey,proto3" json:"wrdsSubKey,omitempty"`
+
+	OffNotification string
 }
 
 func (x *Message) Reset() {

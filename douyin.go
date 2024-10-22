@@ -5,12 +5,14 @@ import (
 	"compress/gzip"
 	"douyinlive/generated/douyin"
 	"douyinlive/jsScript"
+	"douyinlive/model"
 	"douyinlive/utils"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +28,12 @@ var (
 	roomIDRegexp = regexp.MustCompile(`roomId\\":\\"(\d+)\\"`)
 	pushIDRegexp = regexp.MustCompile(`user_unique_id\\":\\"(\d+)\\"`)
 )
+
+type StopChanData struct {
+	RoomId int
+}
+
+var StopChan = make(chan StopChanData)
 
 // DouyinLive 结构体表示一个抖音直播连接
 
@@ -158,7 +166,7 @@ func (d *DouyinLive) GzipUnzipReset(compressedData []byte) ([]byte, error) {
 }
 
 // Start 开始连接和处理消息
-func (d *DouyinLive) Start() {
+func (d *DouyinLive) Start(roomId, liveId int) {
 	var err error
 	d.wssurl = d.StitchUrl()
 	d.headers.Add("user-agent", d.userAgent)
@@ -169,8 +177,8 @@ func (d *DouyinLive) Start() {
 		log.Printf("链接失败: err:%v\nroomid:%v\n ttwid:%v\nwssurl:----%v\nresponse:%v\n", err, d.roomid, d.ttwid, d.wssurl, response)
 		return
 	}
-	log.Println("链接成功")
 	d.isLiveClosed = true
+	log.Printf("直播间%s链接成功\n", strconv.Itoa(roomId))
 	defer func() {
 		if d.gzip != nil {
 			err := d.gzip.Close()
@@ -188,61 +196,79 @@ func (d *DouyinLive) Start() {
 				log.Println("抖音ws链接关闭")
 			}
 		}
+		log.Printf("直播间%s链接已关闭\n", strconv.Itoa(roomId))
+		d.emit(&douyin.Message{OffNotification: "closed", Method: "WebcastOffNotificationMessage"})
 	}()
 	var pbPac = &douyin.PushFrame{}
 	var pbResp = &douyin.Response{}
 	var pbAck = &douyin.PushFrame{}
 	for d.isLiveClosed {
-		messageType, message, err := d.Conn.ReadMessage()
-		if err != nil {
-			log.Println("读取消息失败-", err, message, messageType)
-			if d.reconnect(5) {
-				continue
-			} else {
+		select {
+		//判断chan信息是否是当前的直播间id
+		case stopChanData := <-StopChan:
+			if stopChanData.RoomId == roomId {
+				d.isLiveClosed = false
+				fmt.Println("关闭通道")
 				break
 			}
-		} else {
-			if message != nil {
-				err := proto.Unmarshal(message, pbPac)
-				if err != nil {
-					log.Println("解析消息失败：", err)
-					continue
-				}
-				n := utils.HasGzipEncoding(pbPac.HeadersList)
-				if n && pbPac.PayloadType == "msg" {
-					uncompressedData, err := d.GzipUnzipReset(pbPac.Payload)
-					if err != nil {
-						log.Println("Gzip解压失败:", err)
-						continue
-					}
-
-					err = proto.Unmarshal(uncompressedData, pbResp)
+		default:
+			messageType, message, err := d.Conn.ReadMessage()
+			if err != nil {
+				log.Println("读取消息失败-", err, message, messageType)
+				d.isLiveClosed = false
+				fmt.Println("关闭通道")
+				break
+				// todo 下面代码并不能有效重连，暂时注释
+				//if d.reconnect(5) {
+				//	continue
+				//} else {
+				//	break
+				//}
+			} else {
+				if message != nil {
+					err := proto.Unmarshal(message, pbPac)
 					if err != nil {
 						log.Println("解析消息失败：", err)
 						continue
 					}
-					if pbResp.NeedAck {
-						pbAck.Reset()
-						pbAck.LogId = pbPac.LogId
-						pbAck.PayloadType = "ack"
-						pbAck.Payload = []byte(pbResp.InternalExt)
+					n := utils.HasGzipEncoding(pbPac.HeadersList)
+					if n && pbPac.PayloadType == "msg" {
+						uncompressedData, err := d.GzipUnzipReset(pbPac.Payload)
+						if err != nil {
+							log.Println("Gzip解压失败:", err)
+							continue
+						}
 
-						serializedAck, err := proto.Marshal(pbAck)
+						err = proto.Unmarshal(uncompressedData, pbResp)
 						if err != nil {
-							log.Println("proto心跳包序列化失败:", err)
+							log.Println("解析消息失败：", err)
 							continue
 						}
-						err = d.Conn.WriteMessage(websocket.BinaryMessage, serializedAck)
-						if err != nil {
-							log.Println("心跳包发送失败：", err)
-							continue
+						if pbResp.NeedAck {
+							pbAck.Reset()
+							pbAck.LogId = pbPac.LogId
+							pbAck.PayloadType = "ack"
+							pbAck.Payload = []byte(pbResp.InternalExt)
+
+							serializedAck, err := proto.Marshal(pbAck)
+							if err != nil {
+								log.Println("proto心跳包序列化失败:", err)
+								continue
+							}
+							err = d.Conn.WriteMessage(websocket.BinaryMessage, serializedAck)
+							if err != nil {
+								log.Println("心跳包发送失败：", err)
+								continue
+							}
 						}
+						d.ProcessingMessage(pbResp, liveId)
 					}
-					d.ProcessingMessage(pbResp)
 				}
 			}
 		}
 	}
+	log.Println("退出循环")
+	return
 }
 
 // reconnect 尝试重新连接
@@ -297,19 +323,33 @@ func (d *DouyinLive) emit(eventData *douyin.Message) {
 }
 
 // ProcessingMessage 处理接收到的消息
-func (d *DouyinLive) ProcessingMessage(response *douyin.Response) {
+func (d *DouyinLive) ProcessingMessage(response *douyin.Response, liveId int) {
 	for _, data := range response.MessagesList {
-		d.emit(data)
-		if data.Method == "WebcastControlMessage" {
-			msg := &douyin.ControlMessage{}
+		//if data.Method == "WebcastControlMessage" {
+		//	msg := &douyin.ControlMessage{}
+		//	err := proto.Unmarshal(data.Payload, msg)
+		//	if err != nil {
+		//		log.Println("解析protobuf失败", err)
+		//		return
+		//	}
+		//	if msg.Status == 3 {
+		//		d.isLiveClosed = false
+		//		log.Println("关闭ws链接成功")
+		//	}
+		//}
+
+		if data.Method == "WebcastChatMessage" {
+			d.emit(data)
+			msg := &douyin.ChatMessage{}
 			err := proto.Unmarshal(data.Payload, msg)
 			if err != nil {
 				log.Println("解析protobuf失败", err)
 				return
 			}
-			if msg.Status == 3 {
-				d.isLiveClosed = false
-				log.Println("关闭ws链接成功")
+			log.Println("聊天msg", msg.User.NickName, msg.Content)
+			content := d.FilterMessage(msg.Content)
+			if content != "" {
+				model.InsertComments(liveId, content)
 			}
 		}
 	}
@@ -318,4 +358,43 @@ func (d *DouyinLive) ProcessingMessage(response *douyin.Response) {
 // Subscribe 订阅事件处理器
 func (d *DouyinLive) Subscribe(handler EventHandler) {
 	d.eventHandlers = append(d.eventHandlers, handler)
+}
+
+func Close(roomId int) {
+	data := StopChanData{
+		RoomId: roomId,
+	}
+	StopChan <- data
+}
+
+// 过滤消息
+func (d *DouyinLive) FilterMessage(message string) string {
+	//去除内容的表情符号
+	reg := regexp.MustCompile(`\[.*?\]`)
+	message = reg.ReplaceAllString(message, "")
+
+	//过滤emoji表情
+	emojiReg := regexp.MustCompile("[\U00010000-\U0010ffff]")
+	message = emojiReg.ReplaceAllString(message, "")
+
+	//过滤中文文字小于4的内容
+	if len(message) < 12 {
+		return ""
+	}
+
+	//过滤全英文字母的内容
+	alphaRegex := regexp.MustCompile(`^[a-zA-Z]+$`)
+	if alphaRegex.MatchString(message) {
+		return ""
+	}
+
+	// 过滤包含链接或疑似链接的内容
+	urlRegex := regexp.MustCompile(
+		`https?://(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:/[^ \n]*)?|` +
+			`\b(?:\.com|www|.cn|.net)\b`,
+	)
+	if urlRegex.MatchString(message) {
+		return ""
+	}
+	return message
 }
