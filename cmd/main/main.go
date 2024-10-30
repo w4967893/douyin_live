@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// 设置 WebSocket 路由
-	http.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/ws/start", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("升级 WebSocket 失败: %v\n", err)
@@ -98,7 +98,7 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/stop", func(w http.ResponseWriter, r *http.Request) {
 		roomIdStr := r.URL.Query().Get("room_id")
 		roomId, _ := strconv.Atoi(roomIdStr)
 		douyinlive.Close(roomId)
