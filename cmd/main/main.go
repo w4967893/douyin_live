@@ -113,8 +113,13 @@ func main() {
 func Subscribe(eventData *douyin.Message) {
 	//关闭通知
 	if eventData.Method == "WebcastOffNotificationMessage" {
+		offNotificationMap := map[string]interface{}{
+			"is_ok":   true,
+			"message": "closed",
+		}
+		offNotification, _ := json.Marshal(offNotificationMap)
 		RangeConnections(func(agentID string, conn *websocket.Conn) {
-			if err := conn.WriteMessage(websocket.TextMessage, []byte("closed")); err != nil {
+			if err := conn.WriteMessage(websocket.TextMessage, offNotification); err != nil {
 				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
 			}
 		})
