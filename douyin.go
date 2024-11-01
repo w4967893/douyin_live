@@ -364,7 +364,13 @@ func Close(roomId int) {
 	data := StopChanData{
 		RoomId: roomId,
 	}
-	StopChan <- data
+
+	select {
+	case StopChan <- data:
+		return
+	default:
+		return
+	}
 }
 
 // 过滤消息

@@ -102,6 +102,15 @@ func main() {
 		roomIdStr := r.URL.Query().Get("room_id")
 		roomId, _ := strconv.Atoi(roomIdStr)
 		douyinlive.Close(roomId)
+
+		responseData := map[string]interface{}{
+			"is_ok":   true,
+			"message": "success",
+		}
+
+		// 将数据编码为 JSON 格式
+		jsonResponse, _ := json.Marshal(responseData)
+		w.Write(jsonResponse)
 	})
 
 	// 启动 WebSocket 服务器
