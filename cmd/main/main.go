@@ -5,8 +5,6 @@ import (
 	"douyinlive/config"
 	"douyinlive/database"
 	"douyinlive/generated/douyin"
-	"douyinlive/utils"
-	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -15,8 +13,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/spf13/pflag"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -134,32 +130,32 @@ func Subscribe(eventData *douyin.Message) {
 		})
 	}
 
-	msg, err := utils.MatchMethod(eventData.Method)
-	if err != nil {
-		if unknown {
-			log.Printf("未知消息，无法处理: %v, %s\n", err, hex.EncodeToString(eventData.Payload))
-		}
-		return
-	}
-
-	if msg != nil {
-		if err := proto.Unmarshal(eventData.Payload, msg); err != nil {
-			log.Printf("反序列化失败: %v, 方法: %s\n", err, eventData.Method)
-			return
-		}
-
-		marshal, err := protojson.Marshal(msg)
-		if err != nil {
-			log.Printf("JSON 序列化失败: %v\n", err)
-			return
-		}
-
-		RangeConnections(func(agentID string, conn *websocket.Conn) {
-			if err := conn.WriteMessage(websocket.TextMessage, marshal); err != nil {
-				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
-			}
-		})
-	}
+	//msg, err := utils.MatchMethod(eventData.Method)
+	//if err != nil {
+	//	if unknown {
+	//		log.Printf("未知消息，无法处理: %v, %s\n", err, hex.EncodeToString(eventData.Payload))
+	//	}
+	//	return
+	//}
+	//
+	//if msg != nil {
+	//	if err := proto.Unmarshal(eventData.Payload, msg); err != nil {
+	//		log.Printf("反序列化失败: %v, 方法: %s\n", err, eventData.Method)
+	//		return
+	//	}
+	//
+	//	marshal, err := protojson.Marshal(msg)
+	//	if err != nil {
+	//		log.Printf("JSON 序列化失败: %v\n", err)
+	//		return
+	//	}
+	//
+	//	RangeConnections(func(agentID string, conn *websocket.Conn) {
+	//		if err := conn.WriteMessage(websocket.TextMessage, marshal); err != nil {
+	//			log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
+	//		}
+	//	})
+	//}
 }
 
 // StoreConnection 储存 WebSocket 客户端连接
