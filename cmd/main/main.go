@@ -130,6 +130,19 @@ func Subscribe(eventData *douyin.Message) {
 		})
 	}
 
+	if eventData.Method == "WebcastErrNotificationMessage" {
+		errNotificationMap := map[string]interface{}{
+			"is_ok":   false,
+			"message": "content failed",
+		}
+		errNotification, _ := json.Marshal(errNotificationMap)
+		RangeConnections(func(agentID string, conn *websocket.Conn) {
+			if err := conn.WriteMessage(websocket.TextMessage, errNotification); err != nil {
+				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
+			}
+		})
+	}
+
 	//msg, err := utils.MatchMethod(eventData.Method)
 	//if err != nil {
 	//	if unknown {

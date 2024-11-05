@@ -174,7 +174,8 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 	var response *http.Response
 	d.Conn, response, err = websocket.DefaultDialer.Dial(d.wssurl, d.headers)
 	if err != nil {
-		log.Printf("链接失败: err:%v\nroomid:%v\n ttwid:%v\nwssurl:----%v\nresponse:%v\n", err, d.roomid, d.ttwid, d.wssurl, response)
+		log.Printf("链接失败: err:%v\nroomid:%v\nresponse:%v\n", err, roomId, response)
+		d.emit(&douyin.Message{ErrNotification: "链接失败", Method: "WebcastErrNotificationMessage"})
 		return
 	}
 	d.isLiveClosed = true
@@ -365,12 +366,7 @@ func Close(roomId int) {
 		RoomId: roomId,
 	}
 
-	select {
-	case StopChan <- data:
-		return
-	default:
-		return
-	}
+	StopChan <- data
 }
 
 // 过滤消息

@@ -281,6 +281,7 @@ type Message struct {
 	WrdsSubKey    string `protobuf:"bytes,8,opt,name=wrdsSubKey,proto3" json:"wrdsSubKey,omitempty"`
 
 	OffNotification string
+	ErrNotification string
 }
 
 func (x *Message) Reset() {
