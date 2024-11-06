@@ -120,6 +120,7 @@ func Subscribe(eventData *douyin.Message) {
 	if eventData.Method == "WebcastOffNotificationMessage" {
 		offNotificationMap := map[string]interface{}{
 			"is_ok":   true,
+			"status":  1,
 			"message": "closed",
 		}
 		offNotification, _ := json.Marshal(offNotificationMap)
@@ -133,6 +134,7 @@ func Subscribe(eventData *douyin.Message) {
 	if eventData.Method == "WebcastErrNotificationMessage" {
 		errNotificationMap := map[string]interface{}{
 			"is_ok":   false,
+			"status":  1,
 			"message": "content failed",
 		}
 		errNotification, _ := json.Marshal(errNotificationMap)
