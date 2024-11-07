@@ -10,11 +10,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/elliotchance/orderedmap"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"math/rand"
 	"strconv"
 	"strings"
+
+	"github.com/elliotchance/orderedmap"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // HasGzipEncoding 判断消息头中是否包含gzip编码
@@ -120,4 +121,24 @@ func RandomUserAgent() string {
 	chromeVersion := chromeVersionList[rand.Intn(len(chromeVersionList))]
 
 	return fmt.Sprintf("Mozilla/5.0 %s AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Safari/537.36", os, chromeVersion)
+}
+
+func RemoveElement(slice []int, target int) []int {
+	result := make([]int, 0, len(slice)) // 创建一个新的切片，预分配与原切片相同大小的空间
+	for _, v := range slice {
+		if v != target { // 如果当前元素不是目标元素，则添加到新切片中
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+func InSlice(slice []int, target int) bool {
+	inSlice := false
+	for _, value := range slice {
+		if value == target {
+			inSlice = true
+		}
+	}
+	return inSlice
 }

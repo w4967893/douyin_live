@@ -5,6 +5,7 @@ import (
 	"douyinlive/config"
 	"douyinlive/database"
 	"douyinlive/generated/douyin"
+	"douyinlive/utils"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -79,17 +80,24 @@ func main() {
 			}
 
 			if liveParam.RoomId != 0 && liveParam.LiveId != 0 {
-				go func() {
-					// 创建 DouyinLive 实例
-					d, err := douyinlive.NewDouyinLive(strconv.Itoa(liveParam.RoomId))
-					if err != nil {
-						log.Fatalf("抖音链接失败: %v", err)
-					}
-					// 订阅事件
-					d.Subscribe(Subscribe)
-					// 开始处理
-					d.Start(liveParam.RoomId, liveParam.LiveId)
-				}()
+				isLiving := utils.InSlice(douyinlive.LivingRoomIds, liveParam.RoomId)
+				// 如果room id没有在抓取弹幕信息，继续执行
+				if !isLiving {
+					douyinlive.LivingRoomIds = append(douyinlive.LivingRoomIds, liveParam.RoomId)
+					go func() {
+						// 创建 DouyinLive 实例
+						d, err := douyinlive.NewDouyinLive(strconv.Itoa(liveParam.RoomId))
+						if err != nil {
+							log.Fatalf("抖音链接失败: %v", err)
+						}
+						// 订阅事件
+						d.Subscribe(Subscribe)
+						// 开始处理
+						d.Start(liveParam.RoomId, liveParam.LiveId)
+					}()
+				} else {
+					log.Printf("room id %v 已在抓取弹幕信息\n", liveParam.RoomId)
+				}
 			}
 		}
 	})
@@ -97,13 +105,21 @@ func main() {
 	http.HandleFunc("/api/stop", func(w http.ResponseWriter, r *http.Request) {
 		roomIdStr := r.URL.Query().Get("room_id")
 		roomId, _ := strconv.Atoi(roomIdStr)
-		douyinlive.Close(roomId)
+
+		// 判断该room id是否正在抓取弹幕
+		isLiving := utils.InSlice(douyinlive.LivingRoomIds, roomId)
 
 		responseData := map[string]interface{}{
-			"is_ok":   true,
-			"message": "success",
+			"is_ok":   false,
+			"message": "room id 并未在抓取弹幕信息",
 		}
-
+		if isLiving == true {
+			douyinlive.Close(roomId)
+			responseData = map[string]interface{}{
+				"is_ok":   true,
+				"message": "success",
+			}
+		}
 		// 将数据编码为 JSON 格式
 		jsonResponse, _ := json.Marshal(responseData)
 		w.Write(jsonResponse)
@@ -121,7 +137,7 @@ func Subscribe(eventData *douyin.Message) {
 		offNotificationMap := map[string]interface{}{
 			"is_ok":   true,
 			"status":  1,
-			"message": "closed",
+			"message": eventData.OffNotification,
 		}
 		offNotification, _ := json.Marshal(offNotificationMap)
 		RangeConnections(func(agentID string, conn *websocket.Conn) {

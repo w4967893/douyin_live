@@ -34,6 +34,7 @@ type StopChanData struct {
 }
 
 var StopChan = make(chan StopChanData)
+var LivingRoomIds []int
 
 // DouyinLive 结构体表示一个抖音直播连接
 
@@ -197,8 +198,10 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 				log.Println("抖音ws链接关闭")
 			}
 		}
+
+		LivingRoomIds = utils.RemoveElement(LivingRoomIds, roomId)
 		log.Printf("直播间%s链接已关闭\n", strconv.Itoa(roomId))
-		d.emit(&douyin.Message{OffNotification: "closed", Method: "WebcastOffNotificationMessage"})
+		d.emit(&douyin.Message{OffNotification: roomId, Method: "WebcastOffNotificationMessage"})
 	}()
 	var pbPac = &douyin.PushFrame{}
 	var pbResp = &douyin.Response{}
