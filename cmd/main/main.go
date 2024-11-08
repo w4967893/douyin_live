@@ -102,6 +102,17 @@ func main() {
 						d.Start(liveParam.RoomId, liveParam.LiveId)
 					}()
 				} else {
+					offNotificationMap := map[string]interface{}{
+						"is_ok": true,
+						"data": responseData{
+							Status: 3,
+							RoomId: liveParam.RoomId,
+						},
+					}
+					offNotification, _ := json.Marshal(offNotificationMap)
+					if err := conn.WriteMessage(websocket.TextMessage, offNotification); err != nil {
+						log.Printf("发送消息到客户端失败: %v\n", err)
+					}
 					log.Printf("room id %v 已在抓取弹幕信息\n", liveParam.RoomId)
 				}
 			}
