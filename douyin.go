@@ -176,7 +176,7 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 	d.Conn, response, err = websocket.DefaultDialer.Dial(d.wssurl, d.headers)
 	if err != nil {
 		log.Printf("链接失败: err:%v\nroomid:%v\nresponse:%v\n", err, roomId, response)
-		d.emit(&douyin.Message{ErrNotification: "链接失败", Method: "WebcastErrNotificationMessage"})
+		d.emit(&douyin.Message{ErrNotificationRoomId: roomId, Method: "WebcastErrNotificationMessage"})
 		return
 	}
 	d.isLiveClosed = true
@@ -201,7 +201,7 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 
 		LivingRoomIds = utils.RemoveElement(LivingRoomIds, roomId)
 		log.Printf("直播间%s链接已关闭\n", strconv.Itoa(roomId))
-		d.emit(&douyin.Message{OffNotification: roomId, Method: "WebcastOffNotificationMessage"})
+		d.emit(&douyin.Message{OffNotificationRoomId: roomId, Method: "WebcastOffNotificationMessage"})
 	}()
 	var pbPac = &douyin.PushFrame{}
 	var pbResp = &douyin.Response{}

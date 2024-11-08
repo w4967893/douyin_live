@@ -27,6 +27,11 @@ type LiveParam struct {
 	Ping   string `json:"ping"`
 }
 
+type responseData struct {
+	RoomId int `json:"room_id"`
+	Status int `json:"status"`
+}
+
 func main() {
 	var port string
 	var room string
@@ -60,6 +65,7 @@ func main() {
 		log.Printf("当前连接数: %d\n", GetConnectionCount())
 
 		defer func() {
+			// 与客户端断开连接，持久化消息
 			log.Printf("客户端 %s 断开连接\n", sec)
 			DeleteConnection(sec)
 		}()
@@ -135,9 +141,11 @@ func Subscribe(eventData *douyin.Message) {
 	//关闭通知
 	if eventData.Method == "WebcastOffNotificationMessage" {
 		offNotificationMap := map[string]interface{}{
-			"is_ok":   true,
-			"status":  1,
-			"message": eventData.OffNotification,
+			"is_ok": true,
+			"data": responseData{
+				Status: 1,
+				RoomId: eventData.OffNotificationRoomId,
+			},
 		}
 		offNotification, _ := json.Marshal(offNotificationMap)
 		RangeConnections(func(agentID string, conn *websocket.Conn) {
@@ -149,9 +157,11 @@ func Subscribe(eventData *douyin.Message) {
 
 	if eventData.Method == "WebcastErrNotificationMessage" {
 		errNotificationMap := map[string]interface{}{
-			"is_ok":   false,
-			"status":  1,
-			"message": "content failed",
+			"is_ok": false,
+			"data": responseData{
+				Status: 1,
+				RoomId: eventData.ErrNotificationRoomId,
+			},
 		}
 		errNotification, _ := json.Marshal(errNotificationMap)
 		RangeConnections(func(agentID string, conn *websocket.Conn) {

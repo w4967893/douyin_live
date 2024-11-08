@@ -280,8 +280,8 @@ type Message struct {
 	WrdsVersion   int64  `protobuf:"varint,7,opt,name=wrdsVersion,proto3" json:"wrdsVersion,omitempty"`
 	WrdsSubKey    string `protobuf:"bytes,8,opt,name=wrdsSubKey,proto3" json:"wrdsSubKey,omitempty"`
 
-	OffNotification int
-	ErrNotification string
+	OffNotificationRoomId int
+	ErrNotificationRoomId int
 }
 
 func (x *Message) Reset() {
