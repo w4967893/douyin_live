@@ -175,6 +175,7 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 	var response *http.Response
 	d.Conn, response, err = websocket.DefaultDialer.Dial(d.wssurl, d.headers)
 	if err != nil {
+		LivingRoomIds = utils.RemoveElement(LivingRoomIds, roomId)
 		log.Printf("链接失败: err:%v\nroomid:%v\nresponse:%v\n", err, roomId, response)
 		d.emit(&douyin.Message{ErrNotificationRoomId: roomId, Method: "WebcastErrNotificationMessage"})
 		return
