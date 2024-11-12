@@ -78,6 +78,14 @@ func main() {
 				break
 			}
 
+			if string(message) == "ping" {
+				pong, _ := json.Marshal("pong")
+				if err := conn.WriteMessage(websocket.TextMessage, pong); err != nil {
+					log.Printf("发送心跳回应到客户端失败: %v\n", err)
+				}
+				continue
+			}
+
 			var liveParam LiveParam
 			err = json.Unmarshal(message, &liveParam)
 			if err != nil {
