@@ -163,7 +163,7 @@ func Subscribe(eventData *douyin.Message) {
 			"is_ok": true,
 			"data": responseData{
 				Status: 1,
-				RoomId: eventData.OffNotificationRoomId,
+				RoomId: eventData.RoomId,
 			},
 		}
 		offNotification, _ := json.Marshal(offNotificationMap)
@@ -179,12 +179,28 @@ func Subscribe(eventData *douyin.Message) {
 			"is_ok": false,
 			"data": responseData{
 				Status: 1,
-				RoomId: eventData.ErrNotificationRoomId,
+				RoomId: eventData.RoomId,
 			},
 		}
 		errNotification, _ := json.Marshal(errNotificationMap)
 		RangeConnections(func(agentID string, conn *websocket.Conn) {
 			if err := conn.WriteMessage(websocket.TextMessage, errNotification); err != nil {
+				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
+			}
+		})
+	}
+
+	if eventData.Method == "WebcastSuccessNotificationMessage" {
+		successNotificationMap := map[string]interface{}{
+			"is_ok": true,
+			"data": responseData{
+				Status: 0,
+				RoomId: eventData.RoomId,
+			},
+		}
+		successNotification, _ := json.Marshal(successNotificationMap)
+		RangeConnections(func(agentID string, conn *websocket.Conn) {
+			if err := conn.WriteMessage(websocket.TextMessage, successNotification); err != nil {
 				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
 			}
 		})

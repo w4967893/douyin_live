@@ -177,10 +177,11 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 	if err != nil {
 		LivingRoomIds = utils.RemoveElement(LivingRoomIds, roomId)
 		log.Printf("链接失败: err:%v\nroomid:%v\nresponse:%v\n", err, roomId, response)
-		d.emit(&douyin.Message{ErrNotificationRoomId: roomId, Method: "WebcastErrNotificationMessage"})
+		d.emit(&douyin.Message{RoomId: roomId, Method: "WebcastErrNotificationMessage"})
 		return
 	}
 	d.isLiveClosed = true
+	d.emit(&douyin.Message{RoomId: roomId, Method: "WebcastSuccessNotificationMessage"})
 	log.Printf("直播间%s链接成功\n", strconv.Itoa(roomId))
 	defer func() {
 		if d.gzip != nil {
@@ -202,7 +203,7 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 
 		LivingRoomIds = utils.RemoveElement(LivingRoomIds, roomId)
 		log.Printf("直播间%s链接已关闭\n", strconv.Itoa(roomId))
-		d.emit(&douyin.Message{OffNotificationRoomId: roomId, Method: "WebcastOffNotificationMessage"})
+		d.emit(&douyin.Message{RoomId: roomId, Method: "WebcastOffNotificationMessage"})
 	}()
 	var pbPac = &douyin.PushFrame{}
 	var pbResp = &douyin.Response{}
