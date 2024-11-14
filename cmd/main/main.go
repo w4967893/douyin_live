@@ -164,7 +164,7 @@ func main() {
 // Subscribe 处理订阅的更新
 func Subscribe(eventData *douyin.Message) {
 	//关闭通知
-	if eventData.Method == "PassiveOffNotification" {
+	if eventData.Method == "OffNotification" {
 		offNotificationMap := map[string]interface{}{
 			"is_ok": true,
 			"data": responseData{
@@ -207,22 +207,6 @@ func Subscribe(eventData *douyin.Message) {
 		successNotification, _ := json.Marshal(successNotificationMap)
 		RangeConnections(func(agentID string, conn *websocket.Conn) {
 			if err := conn.WriteMessage(websocket.TextMessage, successNotification); err != nil {
-				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
-			}
-		})
-	}
-
-	if eventData.Method == "ActiveOffNotification" {
-		activeOffNotificationMap := map[string]interface{}{
-			"is_ok": true,
-			"data": responseData{
-				Status: 5,
-				RoomId: eventData.RoomId,
-			},
-		}
-		activeOffNotification, _ := json.Marshal(activeOffNotificationMap)
-		RangeConnections(func(agentID string, conn *websocket.Conn) {
-			if err := conn.WriteMessage(websocket.TextMessage, activeOffNotification); err != nil {
 				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
 			}
 		})
