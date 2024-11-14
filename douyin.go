@@ -177,12 +177,14 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 	if err != nil {
 		LivingRoomIds = utils.RemoveElement(LivingRoomIds, roomId)
 		log.Printf("链接失败: err:%v\nroomid:%v\nresponse:%v\n", err, roomId, response)
-		d.emit(&douyin.Message{RoomId: roomId, Method: "WebcastErrNotificationMessage"})
+		d.emit(&douyin.Message{RoomId: roomId, Method: "ErrNotification"})
 		return
 	}
 	d.isLiveClosed = true
-	d.emit(&douyin.Message{RoomId: roomId, Method: "WebcastSuccessNotificationMessage"})
+	d.emit(&douyin.Message{RoomId: roomId, Method: "SuccessNotification"})
 	log.Printf("直播间%s链接成功\n", strconv.Itoa(roomId))
+	// 用于判断是否是主动关闭直播间弹幕连接
+	activeClose := false
 	defer func() {
 		if d.gzip != nil {
 			err := d.gzip.Close()
@@ -203,7 +205,11 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 
 		LivingRoomIds = utils.RemoveElement(LivingRoomIds, roomId)
 		log.Printf("直播间%s链接已关闭\n", strconv.Itoa(roomId))
-		d.emit(&douyin.Message{RoomId: roomId, Method: "WebcastOffNotificationMessage"})
+		if activeClose == true {
+			d.emit(&douyin.Message{RoomId: roomId, Method: "ActiveOffNotification"})
+		} else {
+			d.emit(&douyin.Message{RoomId: roomId, Method: "PassiveOffNotification"})
+		}
 	}()
 	var pbPac = &douyin.PushFrame{}
 	var pbResp = &douyin.Response{}
@@ -214,6 +220,7 @@ func (d *DouyinLive) Start(roomId, liveId int) {
 		case stopChanData := <-StopChan:
 			if stopChanData.RoomId == roomId {
 				d.isLiveClosed = false
+				activeClose = true
 				fmt.Println("关闭通道")
 				break
 			}
@@ -366,12 +373,19 @@ func (d *DouyinLive) Subscribe(handler EventHandler) {
 	d.eventHandlers = append(d.eventHandlers, handler)
 }
 
-func Close(roomId int) {
+func Close(roomId int) bool {
 	data := StopChanData{
 		RoomId: roomId,
 	}
 
-	StopChan <- data
+	select {
+	case StopChan <- data:
+		// 发送成功
+		return true
+	case <-time.After(time.Second):
+		// 超时了，可能是因为通道阻塞
+		return false
+	}
 }
 
 // 过滤消息

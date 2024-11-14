@@ -110,15 +110,15 @@ func main() {
 						d.Start(liveParam.RoomId, liveParam.LiveId)
 					}()
 				} else {
-					offNotificationMap := map[string]interface{}{
+					livingNotificationMap := map[string]interface{}{
 						"is_ok": true,
 						"data": responseData{
 							Status: 3,
 							RoomId: liveParam.RoomId,
 						},
 					}
-					offNotification, _ := json.Marshal(offNotificationMap)
-					if err := conn.WriteMessage(websocket.TextMessage, offNotification); err != nil {
+					livingNotification, _ := json.Marshal(livingNotificationMap)
+					if err := conn.WriteMessage(websocket.TextMessage, livingNotification); err != nil {
 						log.Printf("发送消息到客户端失败: %v\n", err)
 					}
 					log.Printf("room id %v 已在抓取弹幕信息\n", liveParam.RoomId)
@@ -139,10 +139,16 @@ func main() {
 			"message": "room id 并未在抓取弹幕信息",
 		}
 		if isLiving == true {
-			douyinlive.Close(roomId)
-			responseData = map[string]interface{}{
-				"is_ok":   true,
-				"message": "success",
+			if douyinlive.Close(roomId) {
+				responseData = map[string]interface{}{
+					"is_ok":   true,
+					"message": "success",
+				}
+			} else {
+				responseData = map[string]interface{}{
+					"is_ok":   false,
+					"message": "room id正在执行解析消息",
+				}
 			}
 		}
 		// 将数据编码为 JSON 格式
@@ -151,14 +157,14 @@ func main() {
 	})
 
 	// 启动 WebSocket 服务器
-	http.ListenAndServe(":18080", nil)
+	http.ListenAndServe(":18080", corsMiddleware(http.DefaultServeMux))
 	log.Printf("WebSocket 服务启动成功，地址为: ws://127.0.0.1:18080/\n")
 }
 
 // Subscribe 处理订阅的更新
 func Subscribe(eventData *douyin.Message) {
 	//关闭通知
-	if eventData.Method == "WebcastOffNotificationMessage" {
+	if eventData.Method == "PassiveOffNotification" {
 		offNotificationMap := map[string]interface{}{
 			"is_ok": true,
 			"data": responseData{
@@ -174,7 +180,7 @@ func Subscribe(eventData *douyin.Message) {
 		})
 	}
 
-	if eventData.Method == "WebcastErrNotificationMessage" {
+	if eventData.Method == "ErrNotification" {
 		errNotificationMap := map[string]interface{}{
 			"is_ok": false,
 			"data": responseData{
@@ -190,7 +196,7 @@ func Subscribe(eventData *douyin.Message) {
 		})
 	}
 
-	if eventData.Method == "WebcastSuccessNotificationMessage" {
+	if eventData.Method == "SuccessNotification" {
 		successNotificationMap := map[string]interface{}{
 			"is_ok": true,
 			"data": responseData{
@@ -201,6 +207,22 @@ func Subscribe(eventData *douyin.Message) {
 		successNotification, _ := json.Marshal(successNotificationMap)
 		RangeConnections(func(agentID string, conn *websocket.Conn) {
 			if err := conn.WriteMessage(websocket.TextMessage, successNotification); err != nil {
+				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
+			}
+		})
+	}
+
+	if eventData.Method == "ActiveOffNotification" {
+		activeOffNotificationMap := map[string]interface{}{
+			"is_ok": true,
+			"data": responseData{
+				Status: 5,
+				RoomId: eventData.RoomId,
+			},
+		}
+		activeOffNotification, _ := json.Marshal(activeOffNotificationMap)
+		RangeConnections(func(agentID string, conn *websocket.Conn) {
+			if err := conn.WriteMessage(websocket.TextMessage, activeOffNotification); err != nil {
 				log.Printf("发送消息到客户端 %s 失败: %v\n", agentID, err)
 			}
 		})
@@ -268,4 +290,19 @@ func GetConnectionCount() int {
 		return true
 	})
 	return count
+}
+
+// corsMiddleware 返回一个处理 CORS 请求的中间件
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 设置允许的源，这里使用通配符 * 表示允许所有源
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
